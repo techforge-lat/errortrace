@@ -26,7 +26,7 @@ type Error struct {
 	statusCode      StatusCode
 	presentationMsg string
 	where           string
-	metadata        map[string]string
+	metadata        map[string]any
 }
 
 func New(err error) *Error {
@@ -41,32 +41,40 @@ func New(err error) *Error {
 }
 
 func (e *Error) Error() string {
-	strBuilder := strings.Builder{}
+	var stringBuilder strings.Builder
+	var errStr string
 
-	if e.statusCode != "" {
-		strBuilder.WriteString(fmt.Sprintf("\n\nstatus: %q\n", e.statusCode))
+	err := e.Err()
+	if err != nil {
+		errStr = err.Error()
 	}
 
-	strBuilder.WriteString(fmt.Sprintf("where: %q\n", e.Where()))
+	stringBuilder.WriteString(fmt.Sprintf("[where=%q] ", e.AgregateWhere()))
 
-	for _, k := range e.getSortedMetadataKeys() {
-		v := e.metadata[k]
-		strBuilder.WriteString(fmt.Sprintf("%s: %q\n", k, v))
+	metadata := make(map[string]any, 0)
+	e.AgregateMetadata(metadata)
+
+	metadata["status_code"] = e.StatusCode()
+	metadata["presentation_msg"] = e.PresentationMsg()
+	metadata["error"] = errStr
+
+	for _, key := range getSortedMetadataKeys(metadata) {
+		value := metadata[key]
+
+		valueStr, ok := value.(string)
+		if !ok {
+			stringBuilder.WriteString(fmt.Sprintf("[%s=%v] ", key, value))
+			continue
+		}
+
+		if valueStr == "" {
+			continue
+		}
+
+		stringBuilder.WriteString(fmt.Sprintf("[%s=%q] ", key, valueStr))
 	}
 
-	if e.presentationMsg != "" {
-		strBuilder.WriteString(fmt.Sprintf("presentationMsg: %q\n", e.presentationMsg))
-	}
-
-	if e.err != nil {
-		strBuilder.WriteString(fmt.Sprintf("\t%s\n\n", e.err))
-	}
-
-	return strBuilder.String()
-}
-
-func (e *Error) ErrorWithContext() string {
-	return fmt.Sprintf("[%s], [%s]", e.Where(), e.err)
+	return stringBuilder.String()[:stringBuilder.Len()-1]
 }
 
 func (e *Error) SetStatusCode(t StatusCode) *Error {
@@ -74,8 +82,27 @@ func (e *Error) SetStatusCode(t StatusCode) *Error {
 	return e
 }
 
+// Err returns the first non *Error type
+func (e *Error) Err() error {
+	var customErr *Error
+	if !errors.As(e.err, &customErr) {
+		return e.err
+	}
+
+	return customErr.Err()
+}
+
 func (e *Error) StatusCode() string {
-	return string(e.statusCode)
+	if e.statusCode != "" {
+		return string(e.statusCode)
+	}
+
+	var customErr *Error
+	if errors.As(e.err, &customErr) {
+		return customErr.StatusCode()
+	}
+
+	return ""
 }
 
 func (e *Error) SetPresentationMsg(msg string) *Error {
@@ -84,7 +111,16 @@ func (e *Error) SetPresentationMsg(msg string) *Error {
 }
 
 func (e *Error) PresentationMsg() string {
-	return e.presentationMsg
+	if e.presentationMsg != "" {
+		return e.presentationMsg
+	}
+
+	var customErr *Error
+	if errors.As(e.err, &customErr) {
+		return customErr.PresentationMsg()
+	}
+
+	return ""
 }
 
 func (e *Error) AddMetadata(key, value string) *Error {
@@ -92,22 +128,35 @@ func (e *Error) AddMetadata(key, value string) *Error {
 	return e
 }
 
+func (e *Error) AgregateMetadata(metadata map[string]any) {
+	var customErr *Error
+	if !errors.As(e.err, &customErr) {
+		return
+	}
+
+	for k, v := range customErr.metadata {
+		metadata[k] = v
+	}
+
+	customErr.AgregateMetadata(metadata)
+}
+
 func (e *Error) Where() string {
 	return e.where
 }
 
-func whereChain(e *Error) string {
-	wrappedErr := &Error{}
+func (e *Error) AgregateWhere() string {
+	var wrappedErr *Error
 	if errors.As(e.err, &wrappedErr) {
-		return fmt.Sprintf("%s => %s", e.where, whereChain(wrappedErr))
+		return fmt.Sprintf("%s => %s", e.where, wrappedErr.AgregateWhere())
 	}
 
 	return e.where
 }
 
-func (e *Error) getSortedMetadataKeys() []string {
+func getSortedMetadataKeys(metadata map[string]any) []string {
 	keys := []string{}
-	for key := range e.metadata {
+	for key := range metadata {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
