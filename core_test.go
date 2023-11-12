@@ -3,6 +3,8 @@ package errortrace
 import (
 	"errors"
 	"testing"
+
+	"github.com/techforge-lat/errortrace/status"
 )
 
 var storageErr = errors.New("psql: could not create user")
@@ -17,18 +19,18 @@ func TestError_Error(t *testing.T) {
 	}{
 		{
 			name: "with default error",
-			err:  New(storageErr).SetStatusCode(InternalError),
-			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:20"] [error="psql: could not create user"] [status_code="internal_error"]`,
+			err:  New(storageErr).SetStatusCode(status.InternalError),
+			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:22"] [error="psql: could not create user"] [status_code="internal_error"]`,
 		},
 		{
 			name: "with errcontext.Error wrapped",
-			err:  New(storageErrWithTracing).SetStatusCode(BadRequest),
-			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:25 => github.com/techforge-lat/errortrace.init:10"] [error="psql: could not create user"] [status_code="bad_request"]`,
+			err:  New(storageErrWithTracing).SetStatusCode(status.BadRequest),
+			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:27 => github.com/techforge-lat/errortrace.init:12"] [error="psql: could not create user"] [status_code="bad_request"]`,
 		},
 		{
 			name: "without wrapped error",
-			err:  New(nil).SetStatusCode(BadRequest).SetPresentationMsg("Boolean validation failed"),
-			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:30"] [presentation_msg="Boolean validation failed"] [status_code="bad_request"]`,
+			err:  New(nil).SetStatusCode(status.BadRequest).SetPresentationMsg("Boolean validation failed"),
+			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:32"] [presentation_msg="Boolean validation failed"] [status_code="bad_request"]`,
 		},
 	}
 	for _, tt := range tests {

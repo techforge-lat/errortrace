@@ -3,30 +3,31 @@ package errortrace
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/techforge-lat/errortrace/status"
 )
-
-type StatusCode string
-
-const (
-	BadRequest    StatusCode = "bad_request"
-	InternalError StatusCode = "internal_error"
-)
-
-var HTTPStatusByStatusCode = map[StatusCode]int{
-	BadRequest:    http.StatusBadRequest,
-	InternalError: http.StatusInternalServerError,
-}
 
 type Error struct {
 	err             error
-	statusCode      StatusCode
+	statusCode      status.Code
 	presentationMsg string
 	where           string
 	metadata        map[string]any
+}
+
+func (e *Error) HasErr() bool {
+	return e.err != nil
+}
+
+func (e *Error) HasStatusCode() bool {
+	return e.statusCode != ""
+}
+
+func (e *Error) HasPresentationMsg() bool {
+	return e.presentationMsg != ""
 }
 
 func New(err error) *Error {
@@ -49,16 +50,18 @@ func (e *Error) Error() string {
 		errStr = err.Error()
 	}
 
-	stringBuilder.WriteString(fmt.Sprintf("[where=%q] ", e.AgregateWhere()))
+	stringBuilder.WriteString(fmt.Sprintf("[where=%q] ", e.Where()))
 
-	metadata := make(map[string]any, 0)
-	e.AgregateMetadata(metadata)
+	metadata := e.AggregateMetadata()
+	if metadata == nil {
+		metadata = make(map[string]any)
+	}
 
 	metadata["status_code"] = e.StatusCode()
 	metadata["presentation_msg"] = e.PresentationMsg()
 	metadata["error"] = errStr
 
-	for _, key := range getSortedMetadataKeys(metadata) {
+	for _, key := range GetSortedMetadataKeys(metadata) {
 		value := metadata[key]
 
 		valueStr, ok := value.(string)
@@ -77,11 +80,6 @@ func (e *Error) Error() string {
 	return stringBuilder.String()[:stringBuilder.Len()-1]
 }
 
-func (e *Error) SetStatusCode(t StatusCode) *Error {
-	e.statusCode = t
-	return e
-}
-
 // Err returns the first non *Error type
 func (e *Error) Err() error {
 	var customErr *Error
@@ -92,6 +90,12 @@ func (e *Error) Err() error {
 	return customErr.Err()
 }
 
+func (e *Error) SetStatusCode(t status.Code) *Error {
+	e.statusCode = t
+	return e
+}
+
+// StatusCode returns the first status code in the *Error chain
 func (e *Error) StatusCode() string {
 	if e.statusCode != "" {
 		return string(e.statusCode)
@@ -110,6 +114,7 @@ func (e *Error) SetPresentationMsg(msg string) *Error {
 	return e
 }
 
+// PresentationMsg returns the first PresentationMsg in the *Error chain
 func (e *Error) PresentationMsg() string {
 	if e.presentationMsg != "" {
 		return e.presentationMsg
@@ -128,33 +133,32 @@ func (e *Error) AddMetadata(key, value string) *Error {
 	return e
 }
 
-func (e *Error) AgregateMetadata(metadata map[string]any) {
+// AggregateMetadata reeturns every metadata in every *Error in the chain
+func (e *Error) AggregateMetadata() map[string]any {
 	var customErr *Error
 	if !errors.As(e.err, &customErr) {
-		return
+		return e.metadata
 	}
 
+	customErr.AggregateMetadata()
 	for k, v := range customErr.metadata {
-		metadata[k] = v
+		e.metadata[k] = v
 	}
 
-	customErr.AgregateMetadata(metadata)
+	return e.metadata
 }
 
+// Where returns the first `where` in the *Error chain
 func (e *Error) Where() string {
-	return e.where
-}
-
-func (e *Error) AgregateWhere() string {
 	var wrappedErr *Error
 	if errors.As(e.err, &wrappedErr) {
-		return fmt.Sprintf("%s => %s", e.where, wrappedErr.AgregateWhere())
+		return fmt.Sprintf("%s => %s", e.where, wrappedErr.Where())
 	}
 
 	return e.where
 }
 
-func getSortedMetadataKeys(metadata map[string]any) []string {
+func GetSortedMetadataKeys(metadata map[string]any) []string {
 	keys := []string{}
 	for key := range metadata {
 		keys = append(keys, key)
