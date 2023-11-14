@@ -41,6 +41,11 @@ func New(err error) *Error {
 	return e
 }
 
+func (e *Error) SetErr(err error) *Error {
+	e.SetErr(err)
+	return e
+}
+
 func (e *Error) Error() string {
 	var stringBuilder strings.Builder
 	var errStr string
