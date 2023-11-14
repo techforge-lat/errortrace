@@ -128,7 +128,11 @@ func (e *Error) PresentationMsg() string {
 	return ""
 }
 
-func (e *Error) AddMetadata(key, value string) *Error {
+func (e *Error) AddMetadata(key string, value any) *Error {
+	if e.metadata == nil {
+		e.metadata = make(map[string]any)
+	}
+
 	e.metadata[key] = value
 	return e
 }
