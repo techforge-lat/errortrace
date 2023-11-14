@@ -50,16 +50,26 @@ func (e *Error) Error() string {
 		errStr = err.Error()
 	}
 
-	stringBuilder.WriteString(fmt.Sprintf("[where=%q] ", e.Where()))
+	stringBuilder.WriteString(fmt.Sprintf("[where=%s] ", e.Where()))
 
 	metadata := e.AggregateMetadata()
 	if metadata == nil {
 		metadata = make(map[string]any)
 	}
 
-	metadata["status_code"] = e.StatusCode()
-	metadata["presentation_msg"] = e.PresentationMsg()
-	metadata["error"] = errStr
+	statusCode := e.StatusCode()
+	if statusCode != "" {
+		stringBuilder.WriteString(fmt.Sprintf("[status_code=%s] ", statusCode))
+	}
+
+	presentationMsg := e.PresentationMsg()
+	if presentationMsg != "" {
+		stringBuilder.WriteString(fmt.Sprintf("[presentation_msg=%s] ", presentationMsg))
+	}
+
+	if errStr != "" {
+		stringBuilder.WriteString(fmt.Sprintf("[error=%s] ", errStr))
+	}
 
 	for _, key := range GetSortedMetadataKeys(metadata) {
 		value := metadata[key]
@@ -74,7 +84,7 @@ func (e *Error) Error() string {
 			continue
 		}
 
-		stringBuilder.WriteString(fmt.Sprintf("[%s=%q] ", key, valueStr))
+		stringBuilder.WriteString(fmt.Sprintf("[%s=%s] ", key, valueStr))
 	}
 
 	return stringBuilder.String()[:stringBuilder.Len()-1]

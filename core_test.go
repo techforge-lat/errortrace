@@ -20,17 +20,17 @@ func TestError_Error(t *testing.T) {
 		{
 			name: "with default error",
 			err:  New(storageErr).SetStatusCode(status.InternalError),
-			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:22"] [error="psql: could not create user"] [status_code="internal_error"]`,
+			want: `[where=github.com/techforge-lat/errortrace.TestError_Error:22] [status_code=internal_error] [error=psql: could not create user]`,
 		},
 		{
 			name: "with errcontext.Error wrapped",
 			err:  New(storageErrWithTracing).SetStatusCode(status.BadRequest),
-			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:27 => github.com/techforge-lat/errortrace.init:12"] [error="psql: could not create user"] [status_code="bad_request"]`,
+			want: `[where=github.com/techforge-lat/errortrace.TestError_Error:27 => github.com/techforge-lat/errortrace.init:12] [status_code=bad_request] [error=psql: could not create user]`,
 		},
 		{
 			name: "without wrapped error",
 			err:  New(nil).SetStatusCode(status.BadRequest).SetPresentationMsg("Boolean validation failed"),
-			want: `[where="github.com/techforge-lat/errortrace.TestError_Error:32"] [presentation_msg="Boolean validation failed"] [status_code="bad_request"]`,
+			want: `[where=github.com/techforge-lat/errortrace.TestError_Error:32] [status_code=bad_request] [presentation_msg=Boolean validation failed]`,
 		},
 	}
 	for _, tt := range tests {
