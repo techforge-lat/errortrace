@@ -42,7 +42,7 @@ func New(err error) *Error {
 }
 
 func (e *Error) SetErr(err error) *Error {
-	e.SetErr(err)
+	e.err = err
 	return e
 }
 
