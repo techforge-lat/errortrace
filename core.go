@@ -146,7 +146,7 @@ func (e *Error) AggregateMetadata() map[string]any {
 
 	customErr.AggregateMetadata()
 	for k, v := range customErr.metadata {
-		e.metadata[k] = v
+		e.AddMetadata(k, v)
 	}
 
 	return e.metadata
