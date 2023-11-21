@@ -31,6 +31,12 @@ func (e *Error) HasPresentationMsg() bool {
 }
 
 func New(err error) *Error {
+	// err is our root causing err, if it doesn't exist
+	// there is nothing to trace
+	if err == nil {
+		return nil
+	}
+
 	fun, _, line, _ := runtime.Caller(1)
 	where := fmt.Sprintf("%s:%d", runtime.FuncForPC(fun).Name(), line)
 
@@ -54,6 +60,10 @@ func (e *Error) SetErr(err error) *Error {
 }
 
 func (e *Error) Error() string {
+	if e == nil {
+		return ""
+	}
+
 	var stringBuilder strings.Builder
 	var errStr string
 
@@ -104,30 +114,54 @@ func (e *Error) Error() string {
 
 // Err returns the causing error of the trace chain
 func (e *Error) Err() error {
+	if e == nil {
+		return nil
+	}
+
 	return e.err
 }
 
 func (e *Error) SetStatusCode(t status.Code) *Error {
+	if e == nil {
+		return nil
+	}
+
 	e.statusCode = t
 	return e
 }
 
 // StatusCode returns the last status in the trace chain
 func (e *Error) StatusCode() string {
+	if e == nil {
+		return ""
+	}
+
 	return string(e.statusCode)
 }
 
 func (e *Error) SetPresentationMsg(msg string) *Error {
+	if e == nil {
+		return nil
+	}
+
 	e.presentationMsg = msg
 	return e
 }
 
 // PresentationMsg returns the last PresentationMsg in the trace chain chain
 func (e *Error) PresentationMsg() string {
+	if e == nil {
+		return ""
+	}
+
 	return e.presentationMsg
 }
 
 func (e *Error) AddMetadata(key string, value any) *Error {
+	if e == nil {
+		return nil
+	}
+
 	if e.metadata == nil {
 		e.metadata = make(map[string]any)
 	}
@@ -138,11 +172,19 @@ func (e *Error) AddMetadata(key string, value any) *Error {
 
 // Metadata reeturns all metadata in the trace chain
 func (e *Error) Metadata() map[string]any {
+	if e == nil {
+		return nil
+	}
+
 	return e.metadata
 }
 
 // Where returns the where trace chain
 func (e *Error) Where() string {
+	if e == nil {
+		return ""
+	}
+
 	return e.where
 }
 

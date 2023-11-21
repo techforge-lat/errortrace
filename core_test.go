@@ -30,7 +30,7 @@ func TestError_Error(t *testing.T) {
 		{
 			name: "without wrapped error",
 			err:  New(nil).SetStatusCode(status.BadRequest).SetPresentationMsg("Boolean validation failed"),
-			want: `[where=github.com/techforge-lat/errortrace.TestError_Error:32] [status_code=bad_request] [presentation_msg=Boolean validation failed]`,
+			want: ``,
 		},
 	}
 	for _, tt := range tests {
