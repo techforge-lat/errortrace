@@ -32,6 +32,13 @@ func (e *Error) HasPresentationMsg() bool {
 
 func New(err error) *Error {
 	fun, _, line, _ := runtime.Caller(1)
+	where := fmt.Sprintf("%s:%d", runtime.FuncForPC(fun).Name(), line)
+
+	customeErr := &Error{}
+	if errors.As(err, &customeErr) {
+		customeErr.where = fmt.Sprintf("%s => %s", where, customeErr.where)
+		return customeErr
+	}
 
 	e := &Error{
 		err:   err,
@@ -57,7 +64,7 @@ func (e *Error) Error() string {
 
 	stringBuilder.WriteString(fmt.Sprintf("[where=%s] ", e.Where()))
 
-	metadata := e.AggregateMetadata()
+	metadata := e.Metadata()
 	if metadata == nil {
 		metadata = make(map[string]any)
 	}
@@ -95,18 +102,9 @@ func (e *Error) Error() string {
 	return stringBuilder.String()[:stringBuilder.Len()-1]
 }
 
-// Err returns the first non *Error type
+// Err returns the causing error of the trace chain
 func (e *Error) Err() error {
-	if e.err == nil {
-		return e
-	}
-
-	var customErr *Error
-	if !errors.As(e.err, &customErr) {
-		return e.err
-	}
-
-	return customErr.Err()
+	return e.err
 }
 
 func (e *Error) SetStatusCode(t status.Code) *Error {
@@ -114,18 +112,9 @@ func (e *Error) SetStatusCode(t status.Code) *Error {
 	return e
 }
 
-// StatusCode returns the first status code in the *Error chain
+// StatusCode returns the last status in the trace chain
 func (e *Error) StatusCode() string {
-	if e.statusCode != "" {
-		return string(e.statusCode)
-	}
-
-	var customErr *Error
-	if errors.As(e.err, &customErr) {
-		return customErr.StatusCode()
-	}
-
-	return ""
+	return string(e.statusCode)
 }
 
 func (e *Error) SetPresentationMsg(msg string) *Error {
@@ -133,18 +122,9 @@ func (e *Error) SetPresentationMsg(msg string) *Error {
 	return e
 }
 
-// PresentationMsg returns the first PresentationMsg in the *Error chain
+// PresentationMsg returns the last PresentationMsg in the trace chain chain
 func (e *Error) PresentationMsg() string {
-	if e.presentationMsg != "" {
-		return e.presentationMsg
-	}
-
-	var customErr *Error
-	if errors.As(e.err, &customErr) {
-		return customErr.PresentationMsg()
-	}
-
-	return ""
+	return e.presentationMsg
 }
 
 func (e *Error) AddMetadata(key string, value any) *Error {
@@ -156,28 +136,13 @@ func (e *Error) AddMetadata(key string, value any) *Error {
 	return e
 }
 
-// AggregateMetadata reeturns every metadata in every *Error in the chain
-func (e *Error) AggregateMetadata() map[string]any {
-	var customErr *Error
-	if !errors.As(e.err, &customErr) {
-		return e.metadata
-	}
-
-	customErr.AggregateMetadata()
-	for k, v := range customErr.metadata {
-		e.AddMetadata(k, v)
-	}
-
+// Metadata reeturns all metadata in the trace chain
+func (e *Error) Metadata() map[string]any {
 	return e.metadata
 }
 
-// Where returns the first `where` in the *Error chain
+// Where returns the where trace chain
 func (e *Error) Where() string {
-	var wrappedErr *Error
-	if errors.As(e.err, &wrappedErr) {
-		return fmt.Sprintf("%s => %s", e.where, wrappedErr.Where())
-	}
-
 	return e.where
 }
 
