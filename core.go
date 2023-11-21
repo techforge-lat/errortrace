@@ -55,6 +55,10 @@ func New(err error) *Error {
 }
 
 func (e *Error) SetErr(err error) *Error {
+	if e == nil {
+		e = &Error{}
+	}
+
 	e.err = err
 	return e
 }
