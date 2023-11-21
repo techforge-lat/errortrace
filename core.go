@@ -97,6 +97,10 @@ func (e *Error) Error() string {
 
 // Err returns the first non *Error type
 func (e *Error) Err() error {
+	if e.err == nil {
+		return e
+	}
+
 	var customErr *Error
 	if !errors.As(e.err, &customErr) {
 		return e.err
