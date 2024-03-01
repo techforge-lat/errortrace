@@ -70,16 +70,16 @@ func (e *Error) Error() string {
 	}
 
 	statusCode := e.StatusCode()
-	if statusCode != "" {
+	if !isEmpty(statusCode) {
 		stringBuilder.WriteString(fmt.Sprintf("[status_code=%s] ", statusCode))
 	}
 
 	presentationMsg := e.PresentationMsg()
-	if presentationMsg != "" {
+	if !isEmpty(presentationMsg) {
 		stringBuilder.WriteString(fmt.Sprintf("[presentation_msg=%s] ", presentationMsg))
 	}
 
-	if errStr != "" {
+	if !isEmpty(errStr) {
 		stringBuilder.WriteString(fmt.Sprintf("[error=%s] ", errStr))
 	}
 
@@ -92,7 +92,7 @@ func (e *Error) Error() string {
 			continue
 		}
 
-		if valueStr == "" {
+		if isEmpty(valueStr) {
 			continue
 		}
 
@@ -162,4 +162,8 @@ func GetSortedMetadataKeys(metadata map[string]any) []string {
 	sort.Strings(keys)
 
 	return keys
+}
+
+func isEmpty(s string) bool {
+	return s == ""
 }
