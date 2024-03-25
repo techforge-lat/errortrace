@@ -11,23 +11,12 @@ import (
 )
 
 type Error struct {
-	err             error
-	statusCode      status.Code
-	presentationMsg string
-	where           string
-	metadata        map[string]any
-}
-
-func (e *Error) HasErr() bool {
-	return e.err != nil
-}
-
-func (e *Error) HasStatusCode() bool {
-	return e.statusCode != ""
-}
-
-func (e *Error) HasPresentationMsg() bool {
-	return e.presentationMsg != ""
+	err        error
+	statusCode status.Code
+	title      string
+	detail     string
+	where      string
+	metadata   map[string]any
 }
 
 func New(err error) *Error {
@@ -48,9 +37,82 @@ func New(err error) *Error {
 	return e
 }
 
+func (e *Error) HasErr() bool {
+	return e.err != nil
+}
+
 func (e *Error) SetErr(err error) *Error {
 	e.err = err
 	return e
+}
+
+func (e *Error) RootErr() error {
+	return e.err
+}
+
+// Err returns the causing error of the trace chain
+func (e *Error) Err() error {
+	if e.err == nil {
+		return nil
+	}
+
+	return e
+}
+
+func (e *Error) HasStatusCode() bool {
+	return e.statusCode != ""
+}
+
+func (e *Error) SetStatusCode(t status.Code) *Error {
+	e.statusCode = t
+	return e
+}
+
+// StatusCode returns the last status in the trace chain
+func (e *Error) StatusCode() string {
+	return string(e.statusCode)
+}
+
+func (e *Error) HasTitle() bool {
+	return e.title != ""
+}
+
+func (e *Error) SetTitle(title string) *Error {
+	e.title = title
+	return e
+}
+
+func (e *Error) HasDetail() bool {
+	return e.detail != ""
+}
+
+func (e *Error) SetDetail(msg string) *Error {
+	e.detail = msg
+	return e
+}
+
+// Detail returns the last Detail in the trace chain chain
+func (e *Error) Detail() string {
+	return e.detail
+}
+
+// Where returns the where trace chain
+func (e *Error) Where() string {
+	return e.where
+}
+
+func (e *Error) AddMetadata(key string, value any) *Error {
+	if e.metadata == nil {
+		e.metadata = make(map[string]any)
+	}
+
+	e.metadata[key] = value
+	return e
+}
+
+// Metadata reeturns all metadata in the trace chain
+func (e *Error) Metadata() map[string]any {
+	return e.metadata
 }
 
 func (e *Error) Error() string {
@@ -74,7 +136,7 @@ func (e *Error) Error() string {
 		stringBuilder.WriteString(fmt.Sprintf("[status_code=%s] ", statusCode))
 	}
 
-	presentationMsg := e.PresentationMsg()
+	presentationMsg := e.Detail()
 	if !isEmpty(presentationMsg) {
 		stringBuilder.WriteString(fmt.Sprintf("[presentation_msg=%s] ", presentationMsg))
 	}
@@ -100,58 +162,6 @@ func (e *Error) Error() string {
 	}
 
 	return stringBuilder.String()[:stringBuilder.Len()-1]
-}
-
-func (e *Error) RootErr() error {
-	return e.err
-}
-
-// Err returns the causing error of the trace chain
-func (e *Error) Err() error {
-	if e.err == nil {
-		return nil
-	}
-
-	return e
-}
-
-func (e *Error) SetStatusCode(t status.Code) *Error {
-	e.statusCode = t
-	return e
-}
-
-// StatusCode returns the last status in the trace chain
-func (e *Error) StatusCode() string {
-	return string(e.statusCode)
-}
-
-func (e *Error) SetPresentationMsg(msg string) *Error {
-	e.presentationMsg = msg
-	return e
-}
-
-// PresentationMsg returns the last PresentationMsg in the trace chain chain
-func (e *Error) PresentationMsg() string {
-	return e.presentationMsg
-}
-
-func (e *Error) AddMetadata(key string, value any) *Error {
-	if e.metadata == nil {
-		e.metadata = make(map[string]any)
-	}
-
-	e.metadata[key] = value
-	return e
-}
-
-// Metadata reeturns all metadata in the trace chain
-func (e *Error) Metadata() map[string]any {
-	return e.metadata
-}
-
-// Where returns the where trace chain
-func (e *Error) Where() string {
-	return e.where
 }
 
 func GetSortedMetadataKeys(metadata map[string]any) []string {

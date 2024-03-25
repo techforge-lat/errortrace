@@ -32,7 +32,7 @@ func TestError_Error(t *testing.T) {
 		},
 		{
 			name: "without wrapped error",
-			err:  New(nil).SetStatusCode(status.BadRequest).SetPresentationMsg("Boolean validation failed").Err(),
+			err:  New(nil).SetStatusCode(status.BadRequest).SetDetail("Boolean validation failed").Err(),
 			want: ``,
 		},
 	}
