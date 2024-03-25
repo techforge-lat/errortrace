@@ -82,6 +82,10 @@ func (e *Error) SetTitle(title string) *Error {
 	return e
 }
 
+func (e *Error) Title() string {
+	return e.title
+}
+
 func (e *Error) HasDetail() bool {
 	return e.detail != ""
 }
