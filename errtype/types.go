@@ -1,4 +1,4 @@
-package status
+package errtype
 
 import "net/http"
 
