@@ -4,12 +4,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/techforge-lat/errortrace/status"
+	"github.com/techforge-lat/errortrace/errtype"
 )
 
 var storageErr = errors.New("psql: could not create user")
 
-var storageErrWithTracing = New(storageErr)
+var storageErrWithTracing = Wrap(storageErr)
+var storageErrWithTracing2 = Wrap(storageErr)
 
 func TestError_Error(t *testing.T) {
 	tests := []struct {
@@ -20,20 +21,26 @@ func TestError_Error(t *testing.T) {
 	}{
 		{
 			name:    "with default error",
-			err:     New(storageErr).SetStatusCode(status.InternalError),
-			want:    `[where=github.com/techforge-lat/errortrace.TestError_Error:23] [status_code=internal_error] [error=psql: could not create user]`,
+			err:     Wrap(storageErr).SetErrCode(errtype.InternalError),
+			want:    "\npsql: could not create user\n\ncode:\tinternal_error\n\ngithub.com/techforge-lat/errortrace.TestError_Error:2",
 			wantErr: true,
 		},
 		{
 			name:    "with errcontext.Error wrapped",
-			err:     New(storageErrWithTracing).SetStatusCode(status.BadRequest),
-			want:    `[where=github.com/techforge-lat/errortrace.TestError_Error:29 => github.com/techforge-lat/errortrace.init:12] [status_code=bad_request] [error=psql: could not create user]`,
+			err:     Wrap(storageErrWithTracing).SetErrCode(errtype.BadRequest),
+			want:    "\npsql: could not create user\n\ncode:\tbad_request\n\ngithub.com/techforge-lat/errortrace.TestError_Error:30\ngithub.com/techforge-lat/errortrace.init:1",
 			wantErr: true,
 		},
 		{
 			name: "without wrapped error",
-			err:  New(nil).SetStatusCode(status.BadRequest).SetDetail("Boolean validation failed").Err(),
+			err:  Wrap(nil).SetErrCode(errtype.BadRequest).SetDetail("Boolean validation failed").Err(),
 			want: ``,
+		},
+		{
+			name:    "with title and detail",
+			err:     Wrap(storageErrWithTracing2).SetErrCode(errtype.BadRequest).SetTitle("Validation Error").SetDetail("Boolean validation failed"),
+			want:    "\npsql: could not create user\n\ntitle:\tValidation Error\ndetail:\tBoolean validation failed\ncode:\tbad_request\n\ngithub.com/techforge-lat/errortrace.TestError_Error:41\ngithub.com/techforge-lat/errortrace.init:1",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

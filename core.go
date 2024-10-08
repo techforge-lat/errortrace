@@ -7,25 +7,26 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/techforge-lat/errortrace/status"
+	"github.com/techforge-lat/errortrace/errtype"
 )
 
 type Error struct {
-	err        error
-	statusCode status.Code
-	title      string
-	detail     string
-	where      string
-	metadata   map[string]any
+	err      error
+	code     errtype.Code
+	title    string
+	detail   string
+	where    string
+	metadata map[string]any
 }
 
-func New(err error) *Error {
+// Wrap wraps an error with tracing information
+func Wrap(err error) *Error {
 	fun, _, line, _ := runtime.Caller(1)
 	where := fmt.Sprintf("%s:%d", runtime.FuncForPC(fun).Name(), line)
 
 	customeErr := &Error{}
 	if errors.As(err, &customeErr) {
-		customeErr.where = fmt.Sprintf("%s => %s", where, customeErr.where)
+		customeErr.where = fmt.Sprintf("%s\n%s", where, customeErr.where)
 		return customeErr
 	}
 
@@ -60,17 +61,17 @@ func (e *Error) Err() error {
 }
 
 func (e *Error) HasStatusCode() bool {
-	return e.statusCode != ""
+	return e.code != ""
 }
 
-func (e *Error) SetStatusCode(t status.Code) *Error {
-	e.statusCode = t
+func (e *Error) SetErrCode(t errtype.Code) *Error {
+	e.code = t
 	return e
 }
 
-// StatusCode returns the last status in the trace chain
-func (e *Error) StatusCode() string {
-	return string(e.statusCode)
+// ErrCode returns the last errtype in the trace chain
+func (e *Error) ErrCode() string {
+	return string(e.code)
 }
 
 func (e *Error) HasTitle() bool {
@@ -128,25 +129,28 @@ func (e *Error) Error() string {
 		errStr = err.Error()
 	}
 
-	stringBuilder.WriteString(fmt.Sprintf("[where=%s] ", e.Where()))
-
 	metadata := e.Metadata()
 	if metadata == nil {
 		metadata = make(map[string]any)
 	}
 
-	statusCode := e.StatusCode()
-	if !isEmpty(statusCode) {
-		stringBuilder.WriteString(fmt.Sprintf("[status_code=%s] ", statusCode))
-	}
-
-	presentationMsg := e.Detail()
-	if !isEmpty(presentationMsg) {
-		stringBuilder.WriteString(fmt.Sprintf("[presentation_msg=%s] ", presentationMsg))
-	}
-
 	if !isEmpty(errStr) {
-		stringBuilder.WriteString(fmt.Sprintf("[error=%s] ", errStr))
+		stringBuilder.WriteString(fmt.Sprintf("\n%s\n", errStr))
+	}
+
+	title := e.Title()
+	if !isEmpty(title) {
+		stringBuilder.WriteString(fmt.Sprintf("\ntitle:\t%s", title))
+	}
+
+	detail := e.Detail()
+	if !isEmpty(detail) {
+		stringBuilder.WriteString(fmt.Sprintf("\ndetail:\t%s", detail))
+	}
+
+	errtypeCode := e.ErrCode()
+	if !isEmpty(errtypeCode) {
+		stringBuilder.WriteString(fmt.Sprintf("\ncode:\t%s", errtypeCode))
 	}
 
 	for _, key := range GetSortedMetadataKeys(metadata) {
@@ -154,7 +158,7 @@ func (e *Error) Error() string {
 
 		valueStr, ok := value.(string)
 		if !ok {
-			stringBuilder.WriteString(fmt.Sprintf("[%s=%v] ", key, value))
+			stringBuilder.WriteString(fmt.Sprintf("\n[%s:\t%v ", key, value))
 			continue
 		}
 
@@ -162,8 +166,10 @@ func (e *Error) Error() string {
 			continue
 		}
 
-		stringBuilder.WriteString(fmt.Sprintf("[%s=%s] ", key, valueStr))
+		stringBuilder.WriteString(fmt.Sprintf("\n%s:\t%s ", key, valueStr))
 	}
+
+	stringBuilder.WriteString(fmt.Sprintf("\n\n%s", e.Where()))
 
 	return stringBuilder.String()[:stringBuilder.Len()-1]
 }
