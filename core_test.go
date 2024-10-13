@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/techforge-lat/errortrace/errtype"
+	"github.com/techforge-lat/errortrace/v2/errtype"
 )
 
 var storageErr = errors.New("psql: could not create user")

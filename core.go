@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/techforge-lat/errortrace/errtype"
+	"github.com/techforge-lat/errortrace/v2/errtype"
 )
 
 type Error struct {
