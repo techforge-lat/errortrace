@@ -3,187 +3,114 @@ package errortrace
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 
 	"github.com/techforge-lat/errortrace/v2/errtype"
 )
 
 type Error struct {
-	err      error
-	code     errtype.Code
-	title    string
-	detail   string
-	where    string
-	metadata map[string]any
+	Title   string  `json:"title,omitempty"`
+	Message string  `json:"message"`
+	Code    string  `json:"code"`
+	Cause   error   `json:"cause,omitempty"`
+	Stack   []Frame `json:"stack,omitempty"`
 }
 
-// Wrap wraps an error with tracing information
-func Wrap(err error) *Error {
-	fun, _, line, _ := runtime.Caller(1)
-	where := fmt.Sprintf("%s:%d", runtime.FuncForPC(fun).Name(), line)
-
-	customeErr := &Error{}
-	if errors.As(err, &customeErr) {
-		customeErr.where = fmt.Sprintf("%s\n%s", where, customeErr.where)
-		return customeErr
-	}
-
-	e := &Error{
-		err:   err,
-		where: fmt.Sprintf("%s:%d", runtime.FuncForPC(fun).Name(), line),
-	}
-
-	return e
+type Frame struct {
+	File     string `json:"file"`
+	Line     int    `json:"line"`
+	Function string `json:"function"`
 }
 
-func (e *Error) HasErr() bool {
-	return e.err != nil
-}
-
-func (e *Error) SetErr(err error) *Error {
-	e.err = err
-	return e
-}
-
-func (e *Error) RootErr() error {
-	return e.err
-}
-
-// Err returns the causing error of the trace chain
-func (e *Error) Err() error {
-	if e.err == nil {
+// OnError starts a new error builder chain if the cause error is not nil.
+// Returns nil if causeError is nil.
+func OnError(causeError error) *Error {
+	if causeError == nil {
 		return nil
 	}
 
-	return e
-}
+	var errTrace *Error
+	if errors.As(causeError, &errTrace) {
+		errTrace.Stack = append(errTrace.Stack, captureStack())
 
-func (e *Error) HasStatusCode() bool {
-	return e.code != ""
-}
-
-func (e *Error) SetErrCode(t errtype.Code) *Error {
-	e.code = t
-	return e
-}
-
-// ErrCode returns the last errtype in the trace chain
-func (e *Error) ErrCode() string {
-	return string(e.code)
-}
-
-func (e *Error) HasTitle() bool {
-	return e.title != ""
-}
-
-func (e *Error) SetTitle(title string) *Error {
-	e.title = title
-	return e
-}
-
-func (e *Error) Title() string {
-	return e.title
-}
-
-func (e *Error) HasDetail() bool {
-	return e.detail != ""
-}
-
-func (e *Error) SetDetail(msg string) *Error {
-	e.detail = msg
-	return e
-}
-
-// Detail returns the last Detail in the trace chain chain
-func (e *Error) Detail() string {
-	return e.detail
-}
-
-// Where returns the where trace chain
-func (e *Error) Where() string {
-	return e.where
-}
-
-func (e *Error) AddMetadata(key string, value any) *Error {
-	if e.metadata == nil {
-		e.metadata = make(map[string]any)
+		return errTrace
 	}
 
-	e.metadata[key] = value
-	return e
+	return &Error{
+		Cause: causeError,
+		Stack: []Frame{captureStack()},
+	}
 }
 
-// Metadata reeturns all metadata in the trace chain
-func (e *Error) Metadata() map[string]any {
-	return e.metadata
+// Code sets the error code
+func (b *Error) WithCode(code errtype.Code) *Error {
+	b.Code = string(code)
+
+	return b
 }
 
-func (e *Error) Error() string {
-	var stringBuilder strings.Builder
-	var errStr string
+// Message sets the error message
+func (b *Error) WithMessage(msg string) *Error {
+	b.Message = msg
 
-	err := e.RootErr()
-	if err != nil {
-		errStr = err.Error()
-	}
+	return b
+}
 
-	metadata := e.Metadata()
-	if metadata == nil {
-		metadata = make(map[string]any)
-	}
+// From adds a cause to the error
+func (b *Error) From(cause error) *Error {
+	b.Cause = cause
 
-	if !isEmpty(errStr) {
-		stringBuilder.WriteString(fmt.Sprintf("\n%s\n", errStr))
-	}
+	return b
+}
 
-	title := e.Title()
-	if !isEmpty(title) {
-		stringBuilder.WriteString(fmt.Sprintf("\ntitle:\t%s", title))
-	}
+func (b *Error) HasTitle() bool {
+	return b.Title != ""
+}
 
-	detail := e.Detail()
-	if !isEmpty(detail) {
-		stringBuilder.WriteString(fmt.Sprintf("\ndetail:\t%s", detail))
-	}
+func (b *Error) WithTitle(title string) *Error {
+	b.Title = title
 
-	errtypeCode := e.ErrCode()
-	if !isEmpty(errtypeCode) {
-		stringBuilder.WriteString(fmt.Sprintf("\ncode:\t%s", errtypeCode))
-	}
+	return b
+}
 
-	for _, key := range GetSortedMetadataKeys(metadata) {
-		value := metadata[key]
+// Error implements the error interface with a logging-friendly format
+func (b *Error) Error() string {
+	var parts []string
 
-		valueStr, ok := value.(string)
-		if !ok {
-			stringBuilder.WriteString(fmt.Sprintf("\n[%s:\t%v ", key, value))
-			continue
+	if len(b.Stack) > 0 {
+		var stackPaths []string
+		// Stack is already in correct order, just format it
+		for _, frame := range b.Stack {
+			file := filepath.Base(frame.File)
+			dir := filepath.Base(filepath.Dir(frame.File))
+			location := fmt.Sprintf("%s/%s:%d", dir, file, frame.Line)
+			stackPaths = append(stackPaths, location)
 		}
-
-		if isEmpty(valueStr) {
-			continue
-		}
-
-		stringBuilder.WriteString(fmt.Sprintf("\n%s:\t%s ", key, valueStr))
+		parts = append(parts, fmt.Sprintf("[stack=%s]", strings.Join(stackPaths, " => ")))
 	}
 
-	stringBuilder.WriteString(fmt.Sprintf("\n\n%s", e.Where()))
-
-	return stringBuilder.String()[:stringBuilder.Len()-1]
-}
-
-func GetSortedMetadataKeys(metadata map[string]any) []string {
-	keys := []string{}
-	for key := range metadata {
-		keys = append(keys, key)
+	if b.Code != "" {
+		parts = append(parts, fmt.Sprintf("[code=%s]", strings.ToLower(b.Code)))
 	}
-	sort.Strings(keys)
 
-	return keys
+	msg := b.Message
+	if b.Cause != nil {
+		msg = fmt.Sprintf("%s: %v", b.Message, b.Cause)
+	}
+	parts = append(parts, fmt.Sprintf("[error=%s]", msg))
+
+	return strings.Join(parts, " ")
 }
 
-func isEmpty(s string) bool {
-	return s == ""
+// captureStack now stores frames in reverse order
+func captureStack() Frame {
+	fn, file, line, _ := runtime.Caller(1)
+
+	return Frame{
+		File:     file,
+		Line:     line,
+		Function: runtime.FuncForPC(fn).Name(),
+	}
 }
