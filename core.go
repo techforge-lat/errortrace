@@ -106,11 +106,18 @@ func (b *Error) Error() string {
 
 // captureStack now stores frames in reverse order
 func captureStack() Frame {
-	fn, file, line, _ := runtime.Caller(1)
+	fn, file, line, _ := runtime.Caller(2)
+
+	fullFuncName := runtime.FuncForPC(fn).Name()
+
+	// Extract just the function name from the full path
+	if lastDot := strings.LastIndex(fullFuncName, "."); lastDot != -1 {
+		fullFuncName = fullFuncName[lastDot+1:]
+	}
 
 	return Frame{
 		File:     file,
 		Line:     line,
-		Function: runtime.FuncForPC(fn).Name(),
+		Function: fullFuncName,
 	}
 }
