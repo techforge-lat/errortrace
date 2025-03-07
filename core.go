@@ -83,12 +83,10 @@ func (b *Error) Error() string {
 		var stackPaths []string
 		// Stack is already in correct order, just format it
 		for _, frame := range b.Stack {
-			file := filepath.Base(frame.File)
-			dir := filepath.Base(filepath.Dir(frame.File))
-			location := fmt.Sprintf("%s/%s:%d", dir, file, frame.Line)
+			location := fmt.Sprintf("%s:%d", frame.File, frame.Line)
 			stackPaths = append(stackPaths, location)
 		}
-		parts = append(parts, fmt.Sprintf("[stack=%s]", strings.Join(stackPaths, " => ")))
+		parts = append(parts, fmt.Sprintf("[stack=%s]", strings.Join(stackPaths, ` > `)))
 	}
 
 	if b.Code != "" {
@@ -110,7 +108,10 @@ func captureStack() Frame {
 
 	fullFuncName := runtime.FuncForPC(fn).Name()
 
-	// Extract just the function name from the full path
+	if lastSlash := strings.LastIndex(fullFuncName, "/"); lastSlash != -1 {
+		file = fmt.Sprintf("%s/%s", fullFuncName[:lastSlash], filepath.Base(file))
+	}
+
 	if lastDot := strings.LastIndex(fullFuncName, "."); lastDot != -1 {
 		fullFuncName = fullFuncName[lastDot+1:]
 	}
